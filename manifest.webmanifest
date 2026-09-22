@@ -1,0 +1,19 @@
+{
+  "name": "Pair Shot",
+  "short_name": "Pair Shot",
+  "description": "2枚でひとつの写真を撮るミニマルなカメラプロトタイプ",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#050505",
+  "theme_color": "#050505",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}
