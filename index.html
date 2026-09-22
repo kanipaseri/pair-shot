@@ -1,0 +1,698 @@
+<!doctype html>
+<html lang="ja">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover, user-scalable=no" />
+  <meta name="theme-color" content="#050505" />
+  <meta name="apple-mobile-web-app-capable" content="yes" />
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+  <meta name="apple-mobile-web-app-title" content="Pair Shot" />
+  <link rel="manifest" href="./manifest.webmanifest" />
+  <link rel="icon" href="./icon.svg" type="image/svg+xml" />
+  <title>Pair Shot</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #050505;
+      --panel: #101010;
+      --line: rgba(255,255,255,.14);
+      --muted: rgba(255,255,255,.55);
+      --soft: rgba(255,255,255,.08);
+      --safe-top: env(safe-area-inset-top, 0px);
+      --safe-bottom: env(safe-area-inset-bottom, 0px);
+    }
+
+    * { box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+    html, body {
+      width: 100%;
+      min-height: 100%;
+      margin: 0;
+      background: var(--bg);
+      color: #fff;
+      font-family: -apple-system, BlinkMacSystemFont, "SF Pro Display", "SF Pro Text", system-ui, sans-serif;
+      overscroll-behavior: none;
+    }
+
+    body {
+      min-height: 100dvh;
+      display: flex;
+      justify-content: center;
+      overflow-x: hidden;
+    }
+
+    button { font: inherit; }
+
+    .app {
+      width: min(100%, 560px);
+      min-height: 100dvh;
+      padding: calc(var(--safe-top) + 12px) 14px calc(var(--safe-bottom) + 18px);
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
+
+    header {
+      height: 38px;
+      display: grid;
+      grid-template-columns: 1fr auto 1fr;
+      align-items: center;
+    }
+
+    .brand {
+      grid-column: 2;
+      font-size: 16px;
+      font-weight: 650;
+      letter-spacing: .02em;
+    }
+
+    .counter {
+      grid-column: 3;
+      justify-self: end;
+      color: var(--muted);
+      font-size: 13px;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .frame {
+      position: relative;
+      width: 100%;
+      background: #000;
+      border: 1px solid var(--line);
+      border-radius: 24px;
+      overflow: hidden;
+      box-shadow: 0 18px 60px rgba(0,0,0,.34);
+    }
+
+    .slot {
+      position: relative;
+      width: 100%;
+      aspect-ratio: 4 / 3;
+      overflow: hidden;
+      background:
+        radial-gradient(circle at 50% 45%, rgba(255,255,255,.055), transparent 48%),
+        #0b0b0b;
+    }
+
+    .slot + .slot { border-top: 1px solid rgba(255,255,255,.12); }
+
+    video, .captured {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+    }
+
+    video.mirror { transform: scaleX(-1); }
+
+    .captured {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      transition: opacity .16s ease;
+    }
+
+    .captured.show { opacity: 1; }
+
+    .slot-label {
+      position: absolute;
+      left: 12px;
+      top: 12px;
+      z-index: 3;
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      width: 27px;
+      height: 27px;
+      border-radius: 999px;
+      background: rgba(0,0,0,.38);
+      border: 1px solid rgba(255,255,255,.16);
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      font-size: 12px;
+      font-weight: 650;
+    }
+
+    .empty {
+      position: absolute;
+      inset: 0;
+      display: grid;
+      place-items: center;
+      color: rgba(255,255,255,.31);
+      font-size: 13px;
+      letter-spacing: .02em;
+    }
+
+    .flash {
+      position: absolute;
+      inset: 0;
+      z-index: 10;
+      background: #fff;
+      opacity: 0;
+      pointer-events: none;
+    }
+
+    .flash.go { animation: flash .16s ease-out; }
+
+    @keyframes flash {
+      0% { opacity: .62; }
+      100% { opacity: 0; }
+    }
+
+    .status {
+      min-height: 20px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 13px;
+      line-height: 20px;
+    }
+
+    .controls {
+      margin-top: auto;
+      min-height: 92px;
+      display: grid;
+      grid-template-columns: 1fr 92px 1fr;
+      align-items: center;
+      gap: 14px;
+      padding-top: 2px;
+    }
+
+    .round, .shutter {
+      border: 0;
+      color: #fff;
+      display: grid;
+      place-items: center;
+      cursor: pointer;
+      touch-action: manipulation;
+    }
+
+    .round {
+      width: 50px;
+      height: 50px;
+      justify-self: center;
+      border-radius: 999px;
+      background: var(--soft);
+      border: 1px solid rgba(255,255,255,.10);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+    }
+
+    .round svg { width: 22px; height: 22px; }
+
+    .round:disabled { opacity: .28; }
+
+    .shutter {
+      width: 76px;
+      height: 76px;
+      justify-self: center;
+      border-radius: 50%;
+      background: transparent;
+      border: 3px solid rgba(255,255,255,.95);
+      position: relative;
+    }
+
+    .shutter::after {
+      content: "";
+      position: absolute;
+      width: 62px;
+      height: 62px;
+      border-radius: 50%;
+      background: #fff;
+      transition: transform .11s ease, opacity .11s ease;
+    }
+
+    .shutter:active::after { transform: scale(.91); opacity: .8; }
+    .shutter:disabled { opacity: .3; }
+
+    .done-actions {
+      display: none;
+      grid-template-columns: 1fr 1.35fr;
+      gap: 10px;
+      padding-bottom: 2px;
+    }
+
+    .done-actions.show { display: grid; }
+
+    .action {
+      min-height: 54px;
+      border: 1px solid rgba(255,255,255,.12);
+      border-radius: 17px;
+      background: rgba(255,255,255,.07);
+      color: #fff;
+      font-weight: 600;
+      font-size: 15px;
+    }
+
+    .action.primary {
+      background: #fff;
+      color: #050505;
+      border-color: #fff;
+    }
+
+    .permission {
+      position: fixed;
+      inset: 0;
+      z-index: 40;
+      display: none;
+      place-items: center;
+      padding: 28px;
+      background: rgba(0,0,0,.82);
+      backdrop-filter: blur(18px);
+      -webkit-backdrop-filter: blur(18px);
+    }
+
+    .permission.show { display: grid; }
+
+    .permission-card {
+      width: min(100%, 390px);
+      padding: 24px;
+      border-radius: 24px;
+      background: #141414;
+      border: 1px solid rgba(255,255,255,.12);
+      text-align: center;
+    }
+
+    .permission-card h1 {
+      margin: 0 0 9px;
+      font-size: 22px;
+    }
+
+    .permission-card p {
+      margin: 0 0 20px;
+      color: var(--muted);
+      line-height: 1.55;
+      font-size: 14px;
+    }
+
+    .start {
+      width: 100%;
+      height: 52px;
+      border: 0;
+      border-radius: 16px;
+      background: #fff;
+      color: #050505;
+      font-weight: 650;
+      font-size: 15px;
+    }
+
+    .toast {
+      position: fixed;
+      left: 50%;
+      bottom: calc(var(--safe-bottom) + 24px);
+      z-index: 50;
+      transform: translate(-50%, 20px);
+      opacity: 0;
+      pointer-events: none;
+      padding: 10px 14px;
+      border-radius: 999px;
+      background: rgba(35,35,35,.9);
+      border: 1px solid rgba(255,255,255,.12);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      font-size: 13px;
+      transition: .2s ease;
+      white-space: nowrap;
+    }
+
+    .toast.show { opacity: 1; transform: translate(-50%, 0); }
+
+    @media (min-height: 860px) {
+      .app { padding-left: 18px; padding-right: 18px; gap: 14px; }
+      header { height: 44px; }
+    }
+  </style>
+</head>
+<body>
+  <main class="app">
+    <header>
+      <div class="brand">Pair Shot</div>
+      <div class="counter" id="counter">0 / 2</div>
+    </header>
+
+    <section class="frame" id="frame" aria-label="Pair Shot camera">
+      <div class="slot" id="slot1">
+        <video id="video1" playsinline muted autoplay></video>
+        <img id="photo1" class="captured" alt="1枚目" />
+        <div class="slot-label">1</div>
+      </div>
+      <div class="slot" id="slot2">
+        <video id="video2" playsinline muted autoplay style="display:none"></video>
+        <img id="photo2" class="captured" alt="2枚目" />
+        <div class="empty" id="empty2">2枚目</div>
+        <div class="slot-label">2</div>
+      </div>
+      <div class="flash" id="flash"></div>
+    </section>
+
+    <div class="status" id="status">1枚目を撮る</div>
+
+    <section class="controls" id="cameraControls">
+      <button class="round" id="flip" aria-label="カメラ切替">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M20 7h-3.2l-1.5-2H8.7L7.2 7H4a2 2 0 0 0-2 2v8a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2V9a2 2 0 0 0-2-2Z"/>
+          <path d="M9.2 11.2a4 4 0 0 1 6.6.5"/>
+          <path d="m16 9.8-.2 2.2-2.2-.2"/>
+          <path d="M14.8 14.8a4 4 0 0 1-6.6-.5"/>
+          <path d="m8 16.2.2-2.2 2.2.2"/>
+        </svg>
+      </button>
+      <button class="shutter" id="shutter" aria-label="撮影"></button>
+      <button class="round" id="reset" aria-label="最初から" disabled>
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M3 12a9 9 0 1 0 3-6.7L3 8"/>
+          <path d="M3 3v5h5"/>
+        </svg>
+      </button>
+    </section>
+
+    <section class="done-actions" id="doneActions">
+      <button class="action" id="newPair">撮り直す</button>
+      <button class="action primary" id="save">保存 / 共有</button>
+    </section>
+  </main>
+
+  <div class="permission" id="permission">
+    <div class="permission-card">
+      <h1>Pair Shot</h1>
+      <p id="permissionText">2枚でひとつ。<br>カメラへのアクセスを許可して始めます。</p>
+      <button class="start" id="startCamera">カメラを始める</button>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+
+  <canvas id="workCanvas" hidden></canvas>
+  <canvas id="pairCanvas" hidden></canvas>
+
+  <script>
+    const video1 = document.getElementById('video1');
+    const video2 = document.getElementById('video2');
+    const photo1 = document.getElementById('photo1');
+    const photo2 = document.getElementById('photo2');
+    const empty2 = document.getElementById('empty2');
+    const counter = document.getElementById('counter');
+    const statusText = document.getElementById('status');
+    const shutter = document.getElementById('shutter');
+    const flip = document.getElementById('flip');
+    const reset = document.getElementById('reset');
+    const cameraControls = document.getElementById('cameraControls');
+    const doneActions = document.getElementById('doneActions');
+    const newPair = document.getElementById('newPair');
+    const save = document.getElementById('save');
+    const permission = document.getElementById('permission');
+    const permissionText = document.getElementById('permissionText');
+    const startCamera = document.getElementById('startCamera');
+    const workCanvas = document.getElementById('workCanvas');
+    const pairCanvas = document.getElementById('pairCanvas');
+    const flash = document.getElementById('flash');
+    const toast = document.getElementById('toast');
+
+    let stream = null;
+    let facingMode = 'environment';
+    let shot1 = null;
+    let shot2 = null;
+    let busy = false;
+    let toastTimer = null;
+
+    function showToast(message) {
+      toast.textContent = message;
+      toast.classList.add('show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => toast.classList.remove('show'), 1800);
+    }
+
+    function pulseFlash() {
+      flash.classList.remove('go');
+      void flash.offsetWidth;
+      flash.classList.add('go');
+    }
+
+    function stopStream() {
+      if (!stream) return;
+      stream.getTracks().forEach(track => track.stop());
+      stream = null;
+    }
+
+    async function startStream(showOverlayOnError = true) {
+      if (!navigator.mediaDevices?.getUserMedia) {
+        permissionText.innerHTML = 'このブラウザではカメラを利用できません。<br>iPhoneのSafariで開いてください。';
+        permission.classList.add('show');
+        return;
+      }
+
+      stopStream();
+
+      try {
+        stream = await navigator.mediaDevices.getUserMedia({
+          video: {
+            facingMode: { ideal: facingMode },
+            width: { ideal: 1920 },
+            height: { ideal: 1440 }
+          },
+          audio: false
+        });
+
+        video1.srcObject = stream;
+        video2.srcObject = stream;
+        await Promise.allSettled([video1.play(), video2.play()]);
+        updateMirror();
+        permission.classList.remove('show');
+      } catch (err) {
+        console.error(err);
+        if (showOverlayOnError) {
+          permissionText.innerHTML = 'カメラを使うにはアクセス許可が必要です。<br>Safariの設定でカメラを許可してください。';
+          permission.classList.add('show');
+        }
+      }
+    }
+
+    function updateMirror() {
+      const mirrored = facingMode === 'user';
+      video1.classList.toggle('mirror', mirrored);
+      video2.classList.toggle('mirror', mirrored);
+    }
+
+    function sourceVideo() {
+      return shot1 ? video2 : video1;
+    }
+
+    function captureFourThree() {
+      const video = sourceVideo();
+      const sw = video.videoWidth;
+      const sh = video.videoHeight;
+
+      if (!sw || !sh) throw new Error('Camera is not ready');
+
+      const targetRatio = 4 / 3;
+      const sourceRatio = sw / sh;
+      let sx = 0, sy = 0, sWidth = sw, sHeight = sh;
+
+      if (sourceRatio > targetRatio) {
+        sWidth = sh * targetRatio;
+        sx = (sw - sWidth) / 2;
+      } else {
+        sHeight = sw / targetRatio;
+        sy = (sh - sHeight) / 2;
+      }
+
+      const outW = 1600;
+      const outH = 1200;
+      workCanvas.width = outW;
+      workCanvas.height = outH;
+      const ctx = workCanvas.getContext('2d', { alpha: false });
+
+      ctx.save();
+      if (facingMode === 'user') {
+        ctx.translate(outW, 0);
+        ctx.scale(-1, 1);
+      }
+      ctx.drawImage(video, sx, sy, sWidth, sHeight, 0, 0, outW, outH);
+      ctx.restore();
+
+      return workCanvas.toDataURL('image/jpeg', 0.94);
+    }
+
+    function render() {
+      const count = (shot1 ? 1 : 0) + (shot2 ? 1 : 0);
+      counter.textContent = count + ' / 2';
+      reset.disabled = count === 0;
+
+      if (!shot1) {
+        photo1.classList.remove('show');
+        video1.style.display = 'block';
+        video2.style.display = 'none';
+        empty2.style.display = 'grid';
+        photo2.classList.remove('show');
+        statusText.textContent = '1枚目を撮る';
+        cameraControls.style.display = 'grid';
+        doneActions.classList.remove('show');
+        return;
+      }
+
+      photo1.src = shot1;
+      photo1.classList.add('show');
+      video1.style.display = 'none';
+
+      if (!shot2) {
+        video2.style.display = 'block';
+        empty2.style.display = 'none';
+        photo2.classList.remove('show');
+        statusText.textContent = '2枚目を撮る';
+        cameraControls.style.display = 'grid';
+        doneActions.classList.remove('show');
+        return;
+      }
+
+      photo2.src = shot2;
+      photo2.classList.add('show');
+      video2.style.display = 'none';
+      empty2.style.display = 'none';
+      statusText.textContent = 'Pair Shot';
+      cameraControls.style.display = 'none';
+      doneActions.classList.add('show');
+    }
+
+    async function takeShot() {
+      if (busy || shot2) return;
+      busy = true;
+      shutter.disabled = true;
+
+      try {
+        const data = captureFourThree();
+        pulseFlash();
+
+        if (!shot1) {
+          shot1 = data;
+        } else {
+          shot2 = data;
+        }
+        render();
+      } catch (err) {
+        console.error(err);
+        showToast('カメラを準備中です');
+      } finally {
+        busy = false;
+        shutter.disabled = false;
+      }
+    }
+
+    async function flipCamera() {
+      if (busy) return;
+      busy = true;
+      flip.disabled = true;
+      facingMode = facingMode === 'environment' ? 'user' : 'environment';
+      try {
+        await startStream(false);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        busy = false;
+        flip.disabled = false;
+      }
+    }
+
+    function clearPair() {
+      shot1 = null;
+      shot2 = null;
+      photo1.removeAttribute('src');
+      photo2.removeAttribute('src');
+      render();
+    }
+
+    function loadImage(src) {
+      return new Promise((resolve, reject) => {
+        const img = new Image();
+        img.onload = () => resolve(img);
+        img.onerror = reject;
+        img.src = src;
+      });
+    }
+
+    async function buildPairBlob() {
+      if (!shot1 || !shot2) throw new Error('Pair incomplete');
+
+      const [top, bottom] = await Promise.all([loadImage(shot1), loadImage(shot2)]);
+      const width = 1600;
+      const eachHeight = 1200;
+      pairCanvas.width = width;
+      pairCanvas.height = eachHeight * 2;
+
+      const ctx = pairCanvas.getContext('2d', { alpha: false });
+      ctx.fillStyle = '#000';
+      ctx.fillRect(0, 0, pairCanvas.width, pairCanvas.height);
+      ctx.drawImage(top, 0, 0, width, eachHeight);
+      ctx.drawImage(bottom, 0, eachHeight, width, eachHeight);
+
+      return new Promise((resolve, reject) => {
+        pairCanvas.toBlob(
+          blob => blob ? resolve(blob) : reject(new Error('Export failed')),
+          'image/jpeg',
+          0.95
+        );
+      });
+    }
+
+    async function savePair() {
+      if (busy) return;
+      busy = true;
+      save.disabled = true;
+      const original = save.textContent;
+      save.textContent = '準備中…';
+
+      try {
+        const blob = await buildPairBlob();
+        const stamp = new Date().toISOString().replace(/[:.]/g, '-');
+        const file = new File([blob], 'pair-shot-' + stamp + '.jpg', { type: 'image/jpeg' });
+
+        if (navigator.canShare && navigator.canShare({ files: [file] })) {
+          await navigator.share({
+            files: [file],
+            title: 'Pair Shot'
+          });
+        } else {
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = file.name;
+          document.body.appendChild(a);
+          a.click();
+          a.remove();
+          setTimeout(() => URL.revokeObjectURL(url), 5000);
+          showToast('画像を書き出しました');
+        }
+      } catch (err) {
+        if (err?.name !== 'AbortError') {
+          console.error(err);
+          showToast('保存できませんでした');
+        }
+      } finally {
+        busy = false;
+        save.disabled = false;
+        save.textContent = original;
+      }
+    }
+
+    shutter.addEventListener('click', takeShot);
+    flip.addEventListener('click', flipCamera);
+    reset.addEventListener('click', clearPair);
+    newPair.addEventListener('click', clearPair);
+    save.addEventListener('click', savePair);
+    startCamera.addEventListener('click', () => startStream(true));
+
+    document.addEventListener('visibilitychange', () => {
+      if (document.visibilityState === 'visible' && !stream) startStream(false);
+    });
+
+    window.addEventListener('beforeunload', stopStream);
+
+    render();
+    startStream(true);
+
+    if ('serviceWorker' in navigator) {
+      window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js').catch(() => {});
+      });
+    }
+  </script>
+</body>
+</html>
