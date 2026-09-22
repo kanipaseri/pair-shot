@@ -88,7 +88,11 @@
       position: relative;
       width: 100%;
       aspect-ratio: 4 / 3;
+      min-width: 0;
+      min-height: 0;
       overflow: hidden;
+      contain: layout paint;
+      isolation: isolate;
       background:
         radial-gradient(circle at 50% 45%, rgba(255,255,255,.055), transparent 48%),
         #0b0b0b;
@@ -97,19 +101,22 @@
     .slot + .slot { border-top: 1px solid rgba(255,255,255,.12); }
 
     video, .captured {
+      position: absolute;
+      inset: 0;
       width: 100%;
       height: 100%;
+      max-width: none;
+      max-height: none;
       object-fit: cover;
+      object-position: center;
       display: block;
     }
 
     video.mirror { transform: scaleX(-1); }
 
     .captured {
-      position: absolute;
-      inset: 0;
       opacity: 0;
-      transition: opacity .16s ease;
+      transition: none;
     }
 
     .captured.show { opacity: 1; }
@@ -136,8 +143,12 @@
     .empty {
       position: absolute;
       inset: 0;
+      z-index: 2;
       display: grid;
       place-items: center;
+      background:
+        radial-gradient(circle at 50% 45%, rgba(255,255,255,.055), transparent 48%),
+        #0b0b0b;
       color: rgba(255,255,255,.31);
       font-size: 13px;
       letter-spacing: .02em;
@@ -336,7 +347,7 @@
         <div class="slot-label">1</div>
       </div>
       <div class="slot" id="slot2">
-        <video id="video2" playsinline muted autoplay style="display:none"></video>
+        <video id="video2" playsinline muted autoplay></video>
         <img id="photo2" class="captured" alt="2枚目" />
         <div class="empty" id="empty2">2枚目</div>
         <div class="slot-label">2</div>
@@ -519,8 +530,6 @@
 
       if (!shot1) {
         photo1.classList.remove('show');
-        video1.style.display = 'block';
-        video2.style.display = 'none';
         empty2.style.display = 'grid';
         photo2.classList.remove('show');
         statusText.textContent = '1枚目を撮る';
@@ -529,12 +538,10 @@
         return;
       }
 
-      photo1.src = shot1;
+      if (photo1.src !== shot1) photo1.src = shot1;
       photo1.classList.add('show');
-      video1.style.display = 'none';
 
       if (!shot2) {
-        video2.style.display = 'block';
         empty2.style.display = 'none';
         photo2.classList.remove('show');
         statusText.textContent = '2枚目を撮る';
@@ -543,9 +550,8 @@
         return;
       }
 
-      photo2.src = shot2;
+      if (photo2.src !== shot2) photo2.src = shot2;
       photo2.classList.add('show');
-      video2.style.display = 'none';
       empty2.style.display = 'none';
       statusText.textContent = 'Pair Shot';
       cameraControls.style.display = 'none';
