@@ -66,6 +66,27 @@
       letter-spacing: .02em;
     }
 
+    .ratio-toggle {
+      grid-column: 1;
+      justify-self: start;
+      height: 31px;
+      min-width: 58px;
+      padding: 0 11px;
+      border-radius: 999px;
+      border: 1px solid rgba(255,255,255,.12);
+      background: rgba(255,255,255,.07);
+      color: #fff;
+      font-size: 12px;
+      font-weight: 650;
+      font-variant-numeric: tabular-nums;
+      letter-spacing: .01em;
+      backdrop-filter: blur(14px);
+      -webkit-backdrop-filter: blur(14px);
+      touch-action: manipulation;
+    }
+
+    .ratio-toggle:disabled { opacity: .35; }
+
     .counter {
       grid-column: 3;
       justify-self: end;
@@ -97,6 +118,8 @@
         radial-gradient(circle at 50% 45%, rgba(255,255,255,.055), transparent 48%),
         #0b0b0b;
     }
+
+    .frame.ratio-3-4 .slot { aspect-ratio: 3 / 2; }
 
     .slot + .slot { border-top: 1px solid rgba(255,255,255,.12); }
 
@@ -336,6 +359,7 @@
 <body>
   <main class="app">
     <header>
+      <button class="ratio-toggle" id="ratioToggle" type="button" aria-label="完成比率を切り替える">2:3</button>
       <div class="brand">Pair Shot</div>
       <div class="counter" id="counter">0 / 2</div>
     </header>
@@ -401,6 +425,8 @@
     const photo1 = document.getElementById('photo1');
     const photo2 = document.getElementById('photo2');
     const empty2 = document.getElementById('empty2');
+    const frame = document.getElementById('frame');
+    const ratioToggle = document.getElementById('ratioToggle');
     const counter = document.getElementById('counter');
     const statusText = document.getElementById('status');
     const shutter = document.getElementById('shutter');
@@ -422,6 +448,7 @@
     let facingMode = 'environment';
     let shot1 = null;
     let shot2 = null;
+    let pairRatio = localStorage.getItem('pairShotRatio') === '3:4' ? '3:4' : '2:3';
     let busy = false;
     let toastTimer = null;
 
@@ -487,14 +514,47 @@
       return shot1 ? video2 : video1;
     }
 
-    function captureFourThree() {
+    function getRatioConfig() {
+      if (pairRatio === '3:4') {
+        return {
+          shotRatio: 3 / 2,
+          shotWidth: 1800,
+          shotHeight: 1200,
+          frameClass: 'ratio-3-4'
+        };
+      }
+
+      return {
+        shotRatio: 4 / 3,
+        shotWidth: 1600,
+        shotHeight: 1200,
+        frameClass: ''
+      };
+    }
+
+    function applyRatioMode() {
+      const config = getRatioConfig();
+      frame.classList.toggle('ratio-3-4', pairRatio === '3:4');
+      ratioToggle.textContent = pairRatio;
+      ratioToggle.setAttribute('aria-label', '完成比率 ' + pairRatio + '。タップで切り替え');
+      localStorage.setItem('pairShotRatio', pairRatio);
+    }
+
+    function toggleRatio() {
+      if (shot1 || shot2 || busy) return;
+      pairRatio = pairRatio === '2:3' ? '3:4' : '2:3';
+      applyRatioMode();
+    }
+
+    function capturePairShot() {
       const video = sourceVideo();
       const sw = video.videoWidth;
       const sh = video.videoHeight;
 
       if (!sw || !sh) throw new Error('Camera is not ready');
 
-      const targetRatio = 4 / 3;
+      const config = getRatioConfig();
+      const targetRatio = config.shotRatio;
       const sourceRatio = sw / sh;
       let sx = 0, sy = 0, sWidth = sw, sHeight = sh;
 
@@ -506,8 +566,8 @@
         sy = (sh - sHeight) / 2;
       }
 
-      const outW = 1600;
-      const outH = 1200;
+      const outW = config.shotWidth;
+      const outH = config.shotHeight;
       workCanvas.width = outW;
       workCanvas.height = outH;
       const ctx = workCanvas.getContext('2d', { alpha: false });
@@ -527,6 +587,7 @@
       const count = (shot1 ? 1 : 0) + (shot2 ? 1 : 0);
       counter.textContent = count + ' / 2';
       reset.disabled = count === 0;
+      ratioToggle.disabled = count > 0;
 
       if (!shot1) {
         photo1.classList.remove('show');
@@ -564,7 +625,7 @@
       shutter.disabled = true;
 
       try {
-        const data = captureFourThree();
+        const data = capturePairShot();
         pulseFlash();
 
         if (!shot1) {
@@ -618,8 +679,9 @@
       if (!shot1 || !shot2) throw new Error('Pair incomplete');
 
       const [top, bottom] = await Promise.all([loadImage(shot1), loadImage(shot2)]);
-      const width = 1600;
-      const eachHeight = 1200;
+      const config = getRatioConfig();
+      const width = config.shotWidth;
+      const eachHeight = config.shotHeight;
       pairCanvas.width = width;
       pairCanvas.height = eachHeight * 2;
 
@@ -679,6 +741,7 @@
     }
 
     shutter.addEventListener('click', takeShot);
+    ratioToggle.addEventListener('click', toggleRatio);
     flip.addEventListener('click', flipCamera);
     reset.addEventListener('click', clearPair);
     newPair.addEventListener('click', clearPair);
@@ -691,6 +754,7 @@
 
     window.addEventListener('beforeunload', stopStream);
 
+    applyRatioMode();
     render();
     startStream(true);
 
